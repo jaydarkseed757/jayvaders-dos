@@ -64,7 +64,7 @@ Keep these straight — several diverge from the original brief:
 INVADERS.C  main(), CLI parsing, startup, state machine
 EGA.C/.H    hardware layer: mode set, vsync, blit, palette, planar pixel ops
 SPRITES.C/.H raw arcade bitmap arrays, sprite structs
-CACHE.C     first-run pre-generation; SPRITES.DAT / SOUNDS.DAT I/O
+CACHE.C/.H  first-run pre-generation; SPRITES.DAT / SOUNDS.DAT I/O
 TITLE.C     title screen, attract mode, high score display
 INPUT.C     keyboard via port 60h
 SOUND.C     PC speaker, SB, SB Pro detection + playback
@@ -80,8 +80,8 @@ Generated at runtime (not committed): `INVADERS.CFG`, `SPRITES.DAT`,
 
 Implement and validate in sequence (each layer validates the previous):
 
-`EGA.C → SPRITES.C → CACHE.C → TITLE.C → INPUT.C → SOUND.C → HISCORE.C →
-GAME.C → INVADERS.C → MAKEFILE`
+`[x] EGA.C → [x] SPRITES.C → [x] CACHE.C → TITLE.C → INPUT.C → SOUND.C →
+HISCORE.C → GAME.C → INVADERS.C → MAKEFILE`
 
 ## Hardware reference (ports)
 
@@ -106,5 +106,3 @@ GAME.C → INVADERS.C → MAKEFILE`
 - Develop on branch `claude/dos-invaders-architecture-7p8dm1`.
 - Commit with clear messages; push to that branch.
 - Do **not** open a pull request unless explicitly asked.
-- Do not write code until the architecture is confirmed, unless explicitly
-  asked to.

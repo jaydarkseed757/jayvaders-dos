@@ -297,7 +297,7 @@ EGA.C       hardware layer: mode set, vsync, blit, palette, pixel ops
 EGA.H       EGA constants, prototypes
 SPRITES.C   raw pixel bitmap arrays for all sprites
 SPRITES.H   sprite structs and prototypes
-CACHE.C     first-run pre-generation; SPRITES.DAT / SOUNDS.DAT I/O
+CACHE.C/.H  first-run pre-generation; SPRITES.DAT / SOUNDS.DAT I/O
 TITLE.C     title screen, attract mode, high score display
 INPUT.C     keyboard scanning via port 60h
 GAME.C      invader grid, bullets, collision, shields, wave logic
@@ -350,22 +350,23 @@ EGA color assignments:
 ## Sprites & Pre-Generation
 
 All sprites pre-rendered to `SPRITES.DAT` on first run. **Zero runtime sprite
-calculation during gameplay** — pure `memcpy` to EGA memory. The cache holds
-both pixel data and a background mask for clean erasure.
+calculation during gameplay** — pure `memcpy` to EGA memory. Erasure is handled
+by dirty-rectangle tracking (`ega_dirty_*` in `EGA.H`); the game loop fills
+dirty rects with black before each redraw.
 
 Sprites to pre-generate:
-- Type A invader: 2 anim frames × 2 (normal + exploding)
-- Type B invader: 2 × 2
-- Type C invader: 2 × 2
-- Player ship: normal + explosion (2 on 386, 4 on 486, 8 on P66)
-- UFO: single frame + explosion
+- Type A / B / C invaders: 2 animation frames each
+- Shared invader explosion: 1 frame (covers all three invader types)
+- Player ship: 1 normal frame; 8 explosion frames (always cached —
+  CPU mode controls how many are displayed: 2 on 386, 4 on 486, 8 on P66)
+- UFO: 2 frames (frame 0 = normal, frame 1 = explosion)
 - Player bullet: 1 frame
 - Bomb rolling: 4 frames
 - Bomb plunger: 4 frames
 - Bomb squiggly: 4 frames
-- Shield: staged damage states (4 states for `SHIELD_STAGED`)
+- Shield: 4 damage states × 16 rows (for `SHIELD_STAGED`)
 - Lives icon: small player ship for HUD
-- Font glyphs: 0–9, A–Z
+- Font glyphs: 0–9, A–Z (36 glyphs × 8 rows)
 
 Invaders use **authentic 11×8 arcade bitmaps** (exact original Space Invaders
 pixel data). Shields use **authentic 24×16 bitmaps** (see D4) authored in
@@ -701,13 +702,13 @@ No floating point. No blocking delays. All timing via vsync and frame counters.
 
 Implement and validate in this order:
 
-1. `EGA.C` — mode set, vsync, pixel ops, palette control
-2. `SPRITES.C` — raw bitmap arrays, authentic arcade pixel data
-3. `CACHE.C` — pre-gen pipeline, DAT read/write
-4. `TITLE.C` — title screen, validates full EGA layer
-5. `INPUT.C` — keyboard via port `60h`
-6. `SOUND.C` — detection, PC speaker, SB, SB Pro
-7. `HISCORE.C` — table management, initials entry
-8. `GAME.C` — full arcade-accurate game logic
-9. `INVADERS.C` — `main()`, state machine, command-line parsing
-10. Final integration and MAKEFILE tuning
+[x] 1. `EGA.C` — mode set, vsync, pixel ops, palette control
+[x] 2. `SPRITES.C` — raw bitmap arrays, authentic arcade pixel data
+[x] 3. `CACHE.C` — pre-gen pipeline, DAT read/write
+    4. `TITLE.C` — title screen, validates full EGA layer
+    5. `INPUT.C` — keyboard via port `60h`
+    6. `SOUND.C` — detection, PC speaker, SB, SB Pro
+    7. `HISCORE.C` — table management, initials entry
+    8. `GAME.C` — full arcade-accurate game logic
+    9. `INVADERS.C` — `main()`, state machine, command-line parsing
+   10. Final integration and MAKEFILE tuning
