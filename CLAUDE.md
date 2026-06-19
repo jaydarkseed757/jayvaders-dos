@@ -65,7 +65,7 @@ INVADERS.C  main(), CLI parsing, startup, state machine
 EGA.C/.H    hardware layer: mode set, vsync, blit, palette, planar pixel ops
 SPRITES.C/.H raw arcade bitmap arrays, sprite structs
 CACHE.C/.H  first-run pre-generation; SPRITES.DAT / SOUNDS.DAT I/O
-TITLE.C     title screen, attract mode, high score display
+TITLE.C/.H  title screen, attract mode, high score display
 INPUT.C     keyboard via port 60h
 SOUND.C     PC speaker, SB, SB Pro detection + playback
 HISCORE.C   high score table load/save/entry
@@ -80,7 +80,7 @@ Generated at runtime (not committed): `INVADERS.CFG`, `SPRITES.DAT`,
 
 Implement and validate in sequence (each layer validates the previous):
 
-`[x] EGA.C → [x] SPRITES.C → [x] CACHE.C → TITLE.C → INPUT.C → SOUND.C →
+`[x] EGA.C → [x] SPRITES.C → [x] CACHE.C → [x] TITLE.C → INPUT.C → SOUND.C →
 HISCORE.C → GAME.C → INVADERS.C → MAKEFILE`
 
 ## Hardware reference (ports)

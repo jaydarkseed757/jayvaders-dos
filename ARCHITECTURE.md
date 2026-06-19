@@ -298,7 +298,7 @@ EGA.H       EGA constants, prototypes
 SPRITES.C   raw pixel bitmap arrays for all sprites
 SPRITES.H   sprite structs and prototypes
 CACHE.C/.H  first-run pre-generation; SPRITES.DAT / SOUNDS.DAT I/O
-TITLE.C     title screen, attract mode, high score display
+TITLE.C/.H  title screen, attract mode, high score display
 INPUT.C     keyboard scanning via port 60h
 GAME.C      invader grid, bullets, collision, shields, wave logic
 SOUND.C     PC speaker, SB, SB Pro detection and playback
@@ -391,9 +391,11 @@ Attract cycle (loops until fire):
 3. Demo game with AI player (15s)
 4. Return to step 1
 
-Demo AI (deterministic, not random):
-- Move player toward nearest falling bomb threat.
-- Fire when any invader is approximately above player X.
+Demo attract (TITLE.C placeholder — steps 8–9 replace with full AI):
+- Frozen invader grid drawn once; player sprite oscillates L↔R.
+- No AI logic, no shooting, no collision — purely visual.
+- Full AI demo (move toward nearest bomb, fire when invader above) is wired
+  by GAME.C / INVADERS.C once those modules exist.
 
 ---
 
@@ -705,7 +707,7 @@ Implement and validate in this order:
 [x] 1. `EGA.C` — mode set, vsync, pixel ops, palette control
 [x] 2. `SPRITES.C` — raw bitmap arrays, authentic arcade pixel data
 [x] 3. `CACHE.C` — pre-gen pipeline, DAT read/write
-    4. `TITLE.C` — title screen, validates full EGA layer
+[x] 4. `TITLE.C` — title screen, validates full EGA layer
     5. `INPUT.C` — keyboard via port `60h`
     6. `SOUND.C` — detection, PC speaker, SB, SB Pro
     7. `HISCORE.C` — table management, initials entry
