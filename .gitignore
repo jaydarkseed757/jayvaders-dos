@@ -1,0 +1,12 @@
+# Runtime-generated data files
+INVADERS.CFG
+SPRITES.DAT
+SOUNDS.DAT
+HISCORES.DAT
+
+# Build outputs
+INVADERS.EXE
+*.OBJ
+*.MAP
+*.LST
+*.ERR
