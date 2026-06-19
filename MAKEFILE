@@ -1,0 +1,34 @@
+# MAKEFILE -- JAYVADERS-DOS
+# Open Watcom 2.0 wmake, 16-bit real-mode DOS, medium model.
+# Targets: all (default), clean, rebuild
+
+CC     = wcc
+CFLAGS = -ml -zf -os -s -d0
+
+OBJS = INVADERS.OBJ &
+       EGA.OBJ &
+       SPRITES.OBJ &
+       CACHE.OBJ &
+       TITLE.OBJ &
+       INPUT.OBJ &
+       SOUND.OBJ &
+       HISCORE.OBJ &
+       GAME.OBJ
+
+all : INVADERS.EXE
+
+INVADERS.EXE : $(OBJS)
+	wlink system dos name $@ option stack=8192 &
+	    file INVADERS.OBJ, EGA.OBJ, SPRITES.OBJ, CACHE.OBJ, &
+	         TITLE.OBJ, INPUT.OBJ, SOUND.OBJ, HISCORE.OBJ, GAME.OBJ
+
+.C.OBJ : .AUTODEPEND
+	$(CC) $(CFLAGS) $<
+
+clean : .SYMBOLIC
+	-del *.OBJ
+	-del INVADERS.EXE
+
+rebuild : .SYMBOLIC
+	wmake clean
+	wmake all
