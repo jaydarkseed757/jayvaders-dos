@@ -5,9 +5,12 @@
  * TITLE.H -- title screen, attract mode, high score display.
  * Open Watcom wcc, medium model (-ml), 16-bit real-mode DOS.
  *
- * CPU_*, STAR_*, SHIELD_* and HiScoreEntry are defined here for build steps
- * 4-8. They move to INVADERS.H in step 9; TITLE.H will then include it.
+ * CPU_*, STAR_*, SHIELD_* are defined here for build steps 4-8.
+ * They move to INVADERS.H in step 9; TITLE.H will then include it.
+ * HiScoreEntry and HISCORE_* moved to HISCORE.H in step 7.
  */
+
+#include "HISCORE.H"
 
 /* CPU modes */
 #define CPU_386  0
@@ -22,17 +25,6 @@
 /* Shield damage modes (GameSettings.shield_mode) */
 #define SHIELD_STAGED  0
 #define SHIELD_PIXEL   1
-
-/* High score table dimensions */
-#define HISCORE_INITIALS_LEN  4   /* 3 chars + NUL */
-#define HISCORE_PER_MODE     10
-
-/* Full definition moves to HISCORE.H (step 7) */
-typedef struct {
-    char  initials[HISCORE_INITIALS_LEN];
-    long  score;
-    int   cpu_mode;
-} HiScoreEntry;
 
 /*
  * title_run() -- blocks until the player presses fire (Space/Enter/Esc).
