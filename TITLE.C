@@ -7,7 +7,6 @@
  */
 
 #include <conio.h>
-#include <string.h>
 #include "EGA.H"
 #include "SPRITES.H"
 #include "CACHE.H"
@@ -36,6 +35,9 @@
  * -------------------------------------------------------------------------*/
 #define MARCH_INV_X_MIN  16
 #define MARCH_INV_X_MAX 296
+/* Logical step per frame. Note: ega_blit_planar requires byte-aligned X, so
+ * draw_march/draw_demo_player mask with ~7 -- visible motion is quantized to
+ * 8-px jumps (every 4th frame at speed 2). Arcade-style stepping; intended. */
 #define MARCH_INV_SPEED   2
 #define MARCH_INV_ANIM_PERIOD 8
 
@@ -56,9 +58,11 @@ static const unsigned char s_cyan_cycle[] = { 3, 11, 3, 11, 3, 27 };
  * -------------------------------------------------------------------------*/
 #define NUM_STARS 64
 
-static int s_star_x[NUM_STARS];
-static int s_star_y[NUM_STARS];
-static int s_star_speed[NUM_STARS];   /* 1 or 2 (parallax for STAR_SCROLL) */
+static int           s_star_x[NUM_STARS];
+static int           s_star_y[NUM_STARS];
+static int           s_star_speed[NUM_STARS];   /* 1 or 2 (STAR_SCROLL parallax) */
+static unsigned char s_star_drawn[NUM_STARS];   /* 1 = white pixel on screen now */
+static int           s_star_phase;              /* current phase, for star_blocked() */
 
 /* -------------------------------------------------------------------------
  * Hi-score column positions
@@ -95,8 +99,6 @@ static int s_inv_dir;        /* +1 right, -1 left */
 static int s_inv_anim;       /* 0 or 1 -- current animation frame */
 static int s_inv_prev_x;     /* last blit X (for dirty rect) */
 
-static int s_blink_on;       /* 1 = PRESS FIRE text visible */
-
 static int s_demo_plr_x;     /* oscillating player X in demo phase */
 static int s_demo_plr_dir;   /* +1 right, -1 left */
 static int s_demo_plr_prev;  /* previous X for dirty rect */
@@ -123,25 +125,65 @@ static void init_stars(void)
         s_star_y[i] = (int)(rng % SCREEN_HEIGHT);
         rng = lcg_next(rng);
         s_star_speed[i] = (int)(rng % 2) + 1;  /* 1 or 2 */
+        s_star_drawn[i] = 0;
+    }
+}
+
+/*
+ * Returns 1 if (x,y) falls within a horizontal band reserved for static art
+ * in the current phase. Stars are suppressed there so scrolling never punches
+ * holes in, or scatters dots over, the logo / text / sprites underneath.
+ * Band-only (X ignored) -- the reserved rows are otherwise clear.
+ */
+static int star_blocked(int y)
+{
+    switch (s_star_phase) {
+    case 0: /* title: logo, marching invader, press-fire, hi-score line */
+        if (y >= LOGO_SPACE_Y && y < LOGO_INV_Y + FONT_H * 3) return 1;
+        if (y >= MARCH_INV_Y   && y < MARCH_INV_Y + INV_H)    return 1;
+        if (y >= PRESS_FIRE_Y  && y < PRESS_FIRE_Y + FONT_H)  return 1;
+        if (y >= HISCORE_Y     && y < HISCORE_Y + FONT_H)     return 1;
+        return 0;
+    case 1: /* hi-score screen: title + header + 10 rows */
+        if (y >= LOGO_SPACE_Y &&
+            y < HISCORE_ROW0_Y + HISCORE_PER_MODE * HISCORE_ROW_H) return 1;
+        return 0;
+    default: /* demo: frozen grid + oscillating player */
+        if (y >= DEMO_GRID_Y &&
+            y < DEMO_GRID_Y + DEMO_GRID_ROWS * DEMO_CELL_H)       return 1;
+        if (y >= DEMO_PLAYER_Y && y < DEMO_PLAYER_Y + PLAYER_H)   return 1;
+        return 0;
     }
 }
 
 static void draw_stars(void)
 {
     int i;
-    for (i = 0; i < NUM_STARS; i++)
-        ega_put_pixel(s_star_x[i], s_star_y[i], EGA_WHITE);
+    for (i = 0; i < NUM_STARS; i++) {
+        if (!star_blocked(s_star_y[i])) {
+            ega_put_pixel(s_star_x[i], s_star_y[i], EGA_WHITE);
+            s_star_drawn[i] = 1;
+        } else {
+            s_star_drawn[i] = 0;
+        }
+    }
 }
 
 static void update_stars_scroll(void)
 {
     int i;
     for (i = 0; i < NUM_STARS; i++) {
-        ega_put_pixel(s_star_x[i], s_star_y[i], EGA_BLACK);
+        if (s_star_drawn[i])
+            ega_put_pixel(s_star_x[i], s_star_y[i], EGA_BLACK);
         s_star_y[i] += s_star_speed[i];
         if (s_star_y[i] >= SCREEN_HEIGHT)
             s_star_y[i] = 0;
-        ega_put_pixel(s_star_x[i], s_star_y[i], EGA_WHITE);
+        if (!star_blocked(s_star_y[i])) {
+            ega_put_pixel(s_star_x[i], s_star_y[i], EGA_WHITE);
+            s_star_drawn[i] = 1;
+        } else {
+            s_star_drawn[i] = 0;
+        }
     }
 }
 
@@ -430,10 +472,12 @@ static int key_fire(void)
 /* -------------------------------------------------------------------------
  * Draw title phase static elements
  * -------------------------------------------------------------------------*/
-static void draw_title_phase(int cpu_mode, const HiScoreEntry *scores)
+static void draw_title_phase(int cpu_mode, int starfield,
+                             const HiScoreEntry *scores)
 {
+    s_star_phase = 0;
     ega_clear(EGA_BLACK);
-    draw_stars();
+    if (starfield != STAR_NONE) draw_stars();
     draw_logo();
     draw_press_fire();
 
@@ -443,7 +487,6 @@ static void draw_title_phase(int cpu_mode, const HiScoreEntry *scores)
 
     init_march();
     draw_march();
-    s_blink_on = 1;
 }
 
 /* -------------------------------------------------------------------------
@@ -458,7 +501,7 @@ void title_run(int cpu_mode, int starfield, const HiScoreEntry *scores)
     int blink_prev;
 
     init_stars();
-    draw_title_phase(cpu_mode, scores);
+    draw_title_phase(cpu_mode, starfield, scores);
 
     phase       = 0;
     phase_frame = 0;
@@ -514,9 +557,15 @@ void title_run(int cpu_mode, int starfield, const HiScoreEntry *scores)
             phase_frame = 0;
             phase = (phase + 1) % 3;
 
+            /* NULL scores hides the hi-score phase: title <-> demo only */
+            if (phase == 1 && scores == 0)
+                phase = 2;
+
+            s_star_phase = phase;
+
             if (phase == 0) {
                 phase_limit = FRAMES_TITLE;
-                draw_title_phase(cpu_mode, scores);
+                draw_title_phase(cpu_mode, starfield, scores);
                 blink_prev = 1;
             } else if (phase == 1) {
                 phase_limit = FRAMES_HISCORE;
