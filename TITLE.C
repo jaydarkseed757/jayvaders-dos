@@ -10,6 +10,7 @@
 #include "EGA.H"
 #include "SPRITES.H"
 #include "CACHE.H"
+#include "SOUND.H"
 #include "TITLE.H"
 
 /* -------------------------------------------------------------------------
@@ -509,10 +510,13 @@ void title_run(int cpu_mode, int starfield, const HiScoreEntry *scores)
     phase_limit = FRAMES_TITLE;
     blink_prev  = 1;
 
+    sound_play(SND_TITLE, SPRI_BG, 160);   /* attract theme */
+
     for (;;) {
         ega_wait_vsync();
 
         if (key_fire()) {
+            sound_stop();
             ega_set_palette(EGA_CYAN, 3);   /* restore default cyan */
             return;
         }
@@ -548,6 +552,9 @@ void title_run(int cpu_mode, int starfield, const HiScoreEntry *scores)
             update_demo_player();
             draw_demo_player();
         }
+
+        /* Advance queued attract audio (PC-speaker notes / SB loop). */
+        sound_update();
 
         /* ----- phase transition ----- */
         phase_frame++;
@@ -588,8 +595,8 @@ void title_run(int cpu_mode, int starfield, const HiScoreEntry *scores)
  * TITLE_TEST -- standalone compile/visual test
  *
  * Compile:
- *   wcc -ml -zf -DTITLE_TEST TITLE.C EGA.OBJ SPRITES.OBJ CACHE.OBJ
- *   wlink file TITLE,EGA,SPRITES,CACHE name TITLETEST
+ *   wcc -ml -zf -DTITLE_TEST TITLE.C EGA.OBJ SPRITES.OBJ CACHE.OBJ SOUND.OBJ
+ *   wlink file TITLE,EGA,SPRITES,CACHE,SOUND name TITLETEST
  * =========================================================================*/
 #ifdef TITLE_TEST
 

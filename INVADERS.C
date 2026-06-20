@@ -460,8 +460,10 @@ int main(int argc, char *argv[])
 
     /* Wire sound hardware config */
     if (s_cfg.sound_auto) {
-        /* Keep port/irq/dma from sound_detect(); apply device choice */
-        s_snd.device = s_cfg.sound_device;
+        /* Keep port/irq/dma from sound_detect(); apply device choice and
+         * match the sample rate to the final device (SBP=22050, else 11025). */
+        s_snd.device      = s_cfg.sound_device;
+        s_snd.sample_rate = (s_snd.device == SOUND_SBP) ? 22050 : 11025;
     } else {
         apply_sound_mode();
     }
@@ -498,7 +500,7 @@ int main(int argc, char *argv[])
      * Ctrl+Break terminates; atexit(cleanup) restores text mode and IRQ1.
      */
     for (;;) {
-        sound_play(SND_TITLE, SPRI_BG, 160);
+        /* title_run owns the attract theme (sound_play/update/stop). */
         title_run(s_cfg.cpu_mode, gs.title_starfield, hiscore_get_table());
         game_run(&gs, hiscore_get_mode(s_cfg.cpu_mode)[0].score, s_cfg.cpu_mode);
     }

@@ -122,6 +122,7 @@ static const int s_bomb_seq[6] = {
 static int s_ufo_x;         /* -1 = absent; otherwise pixel x              */
 static int s_ufo_dir;       /* +1 or -1                                    */
 static int s_ufo_exp_timer; /* >0 = explosion flash in progress            */
+static int s_ufo_exp_x;     /* byte-aligned x where UFO was hit            */
 static int s_ufo_score_val; /* score from this UFO hit                     */
 static int s_ufo_frame_timer; /* countdown for next UFO appearance         */
 
@@ -269,6 +270,7 @@ static void start_wave(int wave)
     s_ufo_x = -1;
     s_ufo_dir = 1;
     s_ufo_exp_timer = 0;
+    s_ufo_exp_x = -UFO_W;
     s_ufo_frame_timer = s_gs.ufo_interval;
 
     /* Shields: reset only on wave 1. */
@@ -327,11 +329,12 @@ static int shield_at(int x, int y, int *si)
     return 0;
 }
 
-/* Player bullet erodes from bottom of shield upward. */
-static void shield_bullet_erode(int bx, int by)
+/* Player bullet erodes from bottom of shield upward. Returns 1 if it hit a
+ * shield (caller consumes the bullet), 0 otherwise. */
+static int shield_bullet_erode(int bx, int by)
 {
     int si;
-    if (!shield_at(bx, by, &si)) return;
+    if (!shield_at(bx, by, &si)) return 0;
 
     if (s_gs.shield_mode == SHIELD_PIXEL) {
         int row = by - SHIELD_Y;
@@ -347,13 +350,15 @@ static void shield_bullet_erode(int bx, int by)
     }
     s_shield_dirty[si] = 1;
     sound_play(SND_SHIELD_HIT, SPRI_LOW, s_shield_x[si] + SHIELD_W / 2);
+    return 1;
 }
 
-/* Invader bomb erodes from top of shield downward. */
-static void shield_bomb_erode(int bx, int by)
+/* Invader bomb erodes from top of shield downward. Returns 1 if it hit a
+ * shield (caller consumes the bomb), 0 otherwise. */
+static int shield_bomb_erode(int bx, int by)
 {
     int si;
-    if (!shield_at(bx, by, &si)) return;
+    if (!shield_at(bx, by, &si)) return 0;
 
     if (s_gs.shield_mode == SHIELD_PIXEL) {
         int row = by - SHIELD_Y;
@@ -368,6 +373,7 @@ static void shield_bomb_erode(int bx, int by)
     }
     s_shield_dirty[si] = 1;
     sound_play(SND_SHIELD_HIT, SPRI_LOW, s_shield_x[si] + SHIELD_W / 2);
+    return 1;
 }
 
 /* Invader marching through a shield row destroys it. */
@@ -469,14 +475,12 @@ static void draw_bombs(void)
 
 static void draw_ufo(void)
 {
-    int blit_x;
-    if (s_ufo_x < 0 && s_ufo_exp_timer <= 0) return;
-    blit_x = (s_ufo_x >= 0 ? s_ufo_x : s_ufo_x) & ~7;
     if (s_ufo_exp_timer > 0) {
-        /* Score flash: draw explosion frame */
-        ega_dirty_add(blit_x, UFO_Y, UFO_W_BYTES * 8, UFO_H);
-        ega_blit_planar(blit_x, UFO_Y, UFO_W_BYTES, UFO_H, g_cache.ufo[1]);
+        /* Score flash: draw explosion frame at the position of the hit. */
+        ega_dirty_add(s_ufo_exp_x, UFO_Y, UFO_W_BYTES * 8, UFO_H);
+        ega_blit_planar(s_ufo_exp_x, UFO_Y, UFO_W_BYTES, UFO_H, g_cache.ufo[1]);
     } else if (s_ufo_x >= 0) {
+        int blit_x = s_ufo_x & ~7;
         ega_dirty_add(blit_x, UFO_Y, UFO_W_BYTES * 8, UFO_H);
         ega_blit_planar(blit_x, UFO_Y, UFO_W_BYTES, UFO_H, g_cache.ufo[0]);
     }
@@ -606,6 +610,7 @@ static int check_bullet_vs_ufo(void)
         s_score += s_ufo_score_val;
         s_score_dirty = 1;
         s_ufo_exp_timer = 30;
+        s_ufo_exp_x = blit_x;
         s_ufo_x = -1;
         s_bullet_x = -1;
         sound_play(SND_UFO_HIT, SPRI_HIGH, blit_x + UFO_W / 2);
@@ -632,7 +637,8 @@ static void check_bullet_vs_bombs(void)
 static void check_bullet_vs_shields(void)
 {
     if (s_bullet_x < 0) return;
-    shield_bullet_erode(s_bullet_x, s_bullet_y);
+    if (shield_bullet_erode(s_bullet_x, s_bullet_y))
+        s_bullet_x = -1;
 }
 
 static void check_bomb_vs_player(int slot)
@@ -841,7 +847,7 @@ static void update_bombs(void)
         if (s_bomb_x[i] < 0) continue;
 
         /* vs shields */
-        shield_bomb_erode(bx, by);
+        if (shield_bomb_erode(bx, by)) { s_bomb_x[i] = -1; continue; }
     }
 
     if (s_bomb_fire_timer > 0) s_bomb_fire_timer--;
