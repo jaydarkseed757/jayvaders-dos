@@ -27,6 +27,9 @@
 static unsigned char s_key_down[KEY_COUNT];
 static unsigned char s_key_edge[KEY_COUNT];
 
+/* Quit-to-DOS request flag (set by the loops on ESC; read in INVADERS.C). */
+int g_quit_requested = 0;
+
 /* Flat scan-code → logical key map; 0xFF = unmapped. */
 static unsigned char s_scan_map[128];
 

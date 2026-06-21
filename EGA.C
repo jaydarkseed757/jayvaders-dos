@@ -10,6 +10,7 @@
 #include <i86.h>    /* int86, union REGS, MK_FP */
 #include <conio.h>  /* inp, outp                */
 #include "EGA.H"
+#include "STATS.H"  /* g_stats frame / vsync / blit counters */
 
 /* VRAM base as a far pointer -- A000:0000 in real mode */
 #define VRAM  ((unsigned char far *)MK_FP(EGA_SEGMENT, 0))
@@ -54,6 +55,14 @@ void ega_set_text_mode(void) {
 void ega_wait_vsync(void) {
     while ( inp(STATUS_REG) & 0x08) ;   /* wait until NOT in vsync */
     while (!(inp(STATUS_REG) & 0x08)) ; /* wait until vsync begins  */
+    g_stats.frames_rendered++;
+}
+
+/* Non-blocking probe: 1 if the CRTC is currently in vertical retrace.
+ * The game loop polls this at the top of a frame -- if a retrace is already
+ * underway after a full frame of work, that frame overran its vsync window. */
+int ega_vsync_active(void) {
+    return (inp(STATUS_REG) & 0x08) ? 1 : 0;
 }
 
 /* =========================================================================
@@ -263,6 +272,8 @@ void ega_blit_planar(int x, int y, int w_bytes, int h,
     if (x + w_bytes * 8 > SCREEN_WIDTH)  return;
     if (y + h > SCREEN_HEIGHT)           return;
 
+    g_stats.sprite_cache_hits++;   /* one cached-frame blit to EGA memory */
+
     plane_stride = (unsigned int)h * (unsigned int)w_bytes;
 
     /* Raw CPU data, write mode 0, all bits, no Set/Reset */
@@ -333,7 +344,8 @@ DirtyRect *ega_dirty_get(int i) {
  * Standalone smoke test -- verifies the EGA layer visually in DOSBox-X
  * before any other module exists.  Build with:
  *   wcc -ml -zf -DEGA_TEST EGA.C
- *   wlink system dos file EGA.obj name EGATEST.EXE
+ *   wcc -ml -zf STATS.C        (EGA now references g_stats)
+ *   wlink system dos file { EGA.obj STATS.obj } name EGATEST.EXE
  *
  * Expected output:
  *   - 16 colour bars filling the screen

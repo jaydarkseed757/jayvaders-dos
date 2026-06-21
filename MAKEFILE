@@ -13,14 +13,16 @@ OBJS = INVADERS.OBJ &
        INPUT.OBJ &
        SOUND.OBJ &
        HISCORE.OBJ &
-       GAME.OBJ
+       GAME.OBJ &
+       STATS.OBJ
 
 all : INVADERS.EXE
 
 INVADERS.EXE : $(OBJS)
 	wlink system dos name $@ option stack=8192 &
 	    file INVADERS.OBJ, EGA.OBJ, SPRITES.OBJ, CACHE.OBJ, &
-	         TITLE.OBJ, INPUT.OBJ, SOUND.OBJ, HISCORE.OBJ, GAME.OBJ
+	         TITLE.OBJ, INPUT.OBJ, SOUND.OBJ, HISCORE.OBJ, GAME.OBJ, &
+	         STATS.OBJ
 
 .C.OBJ : .AUTODEPEND
 	$(CC) $(CFLAGS) $<

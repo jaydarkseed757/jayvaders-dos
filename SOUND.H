@@ -87,4 +87,7 @@ int  cache_save_sounds(void);
 int  cache_load_sounds(void);
 void sound_free(void);
 
+/* Bytes currently allocated for the PCM sample buffer (0 if none). */
+unsigned long sound_pcm_bytes(void);
+
 #endif /* SOUND_H */

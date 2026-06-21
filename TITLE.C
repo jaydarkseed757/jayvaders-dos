@@ -11,7 +11,9 @@
 #include "SPRITES.H"
 #include "CACHE.H"
 #include "SOUND.H"
+#include "INPUT.H"
 #include "TITLE.H"
+#include "STATS.H"
 
 /* -------------------------------------------------------------------------
  * Attract loop timing (~70 Hz vsync)
@@ -514,6 +516,16 @@ void title_run(int cpu_mode, int starfield, const HiScoreEntry *scores)
 
     for (;;) {
         ega_wait_vsync();
+
+        stats_sample_fps(0);   /* attract frames count toward avg FPS */
+
+        /* ESC quits to DOS (cleanup() then shows the stats screen). */
+        if (inp_pressed(KEY_ESC)) {
+            g_quit_requested = 1;
+            sound_stop();
+            ega_set_palette(EGA_CYAN, 3);
+            return;
+        }
 
         if (key_fire()) {
             sound_stop();

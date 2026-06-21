@@ -20,6 +20,7 @@
 #include "HISCORE.H"
 #include "TITLE.H"
 #include "GAME.H"
+#include "STATS.H"
 
 #define CFG_FILE "INVADERS.CFG"
 
@@ -33,12 +34,14 @@ typedef struct {
     int sound_irq;
     int sound_dma;
     int sound_auto;     /* 1 = re-detect on each launch         */
+    int show_stats;     /* 1 = show exit stats screen on quit    */
 } AppConfig;
 
 static AppConfig   s_cfg;
 static SoundConfig s_snd;
 static int         s_ega_active;
 static int         s_inp_active;
+static int         s_stats_armed;   /* 1 once the game session is running */
 
 /* =========================================================================
  * apply_cpu_mode -- per-mode GameSettings table (ARCHITECTURE.md)
@@ -144,6 +147,8 @@ static void parse_cfg_line(const char *line)
         s_cfg.sound_dma = atoi(val);
     } else if (!strcmp(key, "SOUND_AUTO")) {
         s_cfg.sound_auto = atoi(val);
+    } else if (!strcmp(key, "SHOW_STATS")) {
+        s_cfg.show_stats = atoi(val);
     }
 }
 
@@ -182,6 +187,7 @@ static void cfg_save(void)
     fprintf(f, "SOUND_IRQ=%d\n",    s_cfg.sound_irq);
     fprintf(f, "SOUND_DMA=%d\n",    s_cfg.sound_dma);
     fprintf(f, "SOUND_AUTO=%d\n",   s_cfg.sound_auto);
+    fprintf(f, "SHOW_STATS=%d\n",   s_cfg.show_stats);
     fclose(f);
 }
 
@@ -316,6 +322,7 @@ typedef struct {
     int do_reset;
     int do_resethi;
     int do_soundtest;
+    int do_nostats;
 } CmdOpts;
 
 static int parse_hex(const char *s)
@@ -344,6 +351,7 @@ static void parse_args(int argc, char *argv[], CmdOpts *o)
     o->do_reset       = 0;
     o->do_resethi     = 0;
     o->do_soundtest   = 0;
+    o->do_nostats     = 0;
 
     for (i = 1; i < argc; i++) {
         a = argv[i];
@@ -361,6 +369,7 @@ static void parse_args(int argc, char *argv[], CmdOpts *o)
         else if (!stricmp(a, "resethi"))   o->do_resethi     = 1;
         else if (!stricmp(a, "resetall")) { o->do_reset = 1; o->do_resethi = 1; }
         else if (!stricmp(a, "SOUNDTEST")) o->do_soundtest   = 1;
+        else if (!stricmp(a, "NOSTATS"))   o->do_nostats     = 1;
         else if (!strnicmp(a, "PORT:", 5)) o->override_port  = parse_hex(a + 5);
         else if (!strnicmp(a, "IRQ:", 4))  o->override_irq   = atoi(a + 4);
         else if (!strnicmp(a, "DMA:", 4))  o->override_dma   = atoi(a + 4);
@@ -396,11 +405,28 @@ static void generate_sounds(void)
  * =========================================================================*/
 static void cleanup(void)
 {
+    /* Snapshot memory BEFORE freeing the sprite/PCM buffers (their sizes feed
+     * the stats). Display happens AFTER text mode is restored, below. */
+    if (s_stats_armed) {
+        unsigned int spr_kb  = (unsigned int)((g_cache.data_size + 1023UL) / 1024UL);
+        unsigned int pcm_kb  = (unsigned int)((sound_pcm_bytes() + 1023UL) / 1024UL);
+        unsigned int near_kb = stats_near_estimate();
+        unsigned int peak_kb = spr_kb + pcm_kb;   /* dominant allocations */
+        stats_read_pit(&g_stats.exit_ticks);
+        stats_snapshot_memory(spr_kb, pcm_kb, near_kb, peak_kb);
+    }
+
     if (s_inp_active) { inp_remove(); s_inp_active = 0; }
     sound_shutdown();
     sound_free();
     cache_free();
     if (s_ega_active) { ega_set_text_mode(); s_ega_active = 0; }
+
+    if (s_stats_armed && s_cfg.show_stats) {
+        stats_display(s_cfg.cpu_mode, s_snd.device,
+                      s_snd.port, s_snd.irq, s_snd.dma);
+        s_stats_armed = 0;   /* guard against re-entry */
+    }
 }
 
 /* =========================================================================
@@ -435,6 +461,7 @@ int main(int argc, char *argv[])
     if (opts.do_reset)
         remove(CFG_FILE);
 
+    s_cfg.show_stats = 1;   /* default on; CFG / CLI may disable */
     first_run = !cfg_load();
 
     if (first_run) {
@@ -454,6 +481,7 @@ int main(int argc, char *argv[])
     if (opts.override_port  >  0) s_cfg.sound_port   = opts.override_port;
     if (opts.override_irq   >= 0) s_cfg.sound_irq    = opts.override_irq;
     if (opts.override_dma   >= 0) s_cfg.sound_dma    = opts.override_dma;
+    if (opts.do_nostats)          s_cfg.show_stats   = 0;
 
     if (opts.do_save || first_run)
         cfg_save();
@@ -493,15 +521,22 @@ int main(int argc, char *argv[])
     inp_install();    s_inp_active = 1;
     sound_init(&s_snd);
 
+    stats_init();
+    s_stats_armed = 1;
+
     apply_cpu_mode(s_cfg.cpu_mode, &gs);
 
     /*
-     * Main game loop. Runs indefinitely (authentic arcade behavior).
-     * Ctrl+Break terminates; atexit(cleanup) restores text mode and IRQ1.
+     * Main game loop. ESC quits to DOS; Ctrl+Break also terminates. Either way
+     * atexit(cleanup) restores text mode/IRQ1 and shows the exit stats screen.
      */
     for (;;) {
         /* title_run owns the attract theme (sound_play/update/stop). */
         title_run(s_cfg.cpu_mode, gs.title_starfield, hiscore_get_table());
+        if (g_quit_requested) break;
         game_run(&gs, hiscore_get_mode(s_cfg.cpu_mode)[0].score, s_cfg.cpu_mode);
+        if (g_quit_requested) break;
     }
+
+    return 0;   /* atexit(cleanup) handles snapshot + stats_display */
 }

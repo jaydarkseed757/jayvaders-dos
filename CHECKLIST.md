@@ -37,6 +37,21 @@
 - [ ] `/reset` — resets config; `/resethi` — resets high scores; `/resetall` — both
 - [ ] `/SOUNDTEST` — runs in text mode (no EGA), plays test tones, exits
 
+## Runtime Statistics (STATS.C/STATS.H)
+
+- [ ] **ESC quits** — pressing ESC from the title screen and mid-game returns to DOS
+- [ ] **Exit stats screen** — appears on quit (both ESC and Ctrl+Break); box renders cleanly with CP437 borders, values right-aligned
+- [ ] **Session** — run time HH:MM:SS, frames rendered, average FPS, lowest FPS with wave number all plausible
+- [ ] **Gameplay** — shots/kills/UFOs/waves/accuracy %/shields eroded %/best score/extra lives match what was played
+- [ ] **Sound line** — shows device + `220h 5 1`, or `N/A` for PC Speaker / Disabled
+- [ ] **Memory** — conventional free non-zero; sprite cache + PCM sizes sane
+- [ ] **Performance** — CPU mode label, vsync misses, sprite cache hits, march events
+- [ ] **Personality tags** — appear when conditions met (CRACK SHOT!, ROCK SOLID, HOOKED!, etc.)
+- [ ] **`/NOSTATS`** — suppresses the stats screen
+- [ ] **`SHOW_STATS=0`** — persists suppression across launches (`/NOSTATS /SAVE` then relaunch)
+- [ ] **Redirection** — `INVADERS.EXE > OUT.TXT`, quit, OUT.TXT shows plain-ASCII layout (no garbled box glyphs)
+- [ ] **Gameplay unaffected** — instrumentation hooks don't change timing or behavior
+
 ## Deferred (not tested this pass)
 
 - [ ] Dead `ufo_interval` / `s_ufo_frame_timer` fields cleanup

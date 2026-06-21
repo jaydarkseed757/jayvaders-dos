@@ -64,6 +64,7 @@ static int s_cur_screen_x;
 
 /* SOUNDS.DAT PCM pool. */
 static unsigned char       *s_snd_buf;
+static unsigned long        s_pcm_bytes;   /* size of s_snd_buf allocation */
 static unsigned long        s_snd_off[SND_COUNT];
 static unsigned long        s_snd_len[SND_COUNT];
 
@@ -586,6 +587,7 @@ int cache_generate_sounds(void)
     s_snd_buf = (unsigned char *)malloc((unsigned int)total);
     if (!s_snd_buf)
         return 0;
+    s_pcm_bytes = total;
 
     synthesize_all(s_snd_buf, s_cfg.sample_rate);
     return 1;
@@ -682,10 +684,12 @@ int cache_load_sounds(void)
     total = s_snd_off[SND_COUNT-1] + s_snd_len[SND_COUNT-1];
     s_snd_buf = (unsigned char *)malloc((unsigned int)total);
     if (!s_snd_buf) { fclose(f); return 0; }
+    s_pcm_bytes = total;
 
     if (fread(s_snd_buf, 1, (unsigned int)total, f) != (unsigned int)total) {
         free(s_snd_buf);
         s_snd_buf = NULL;
+        s_pcm_bytes = 0;
         fclose(f);
         return 0;
     }
@@ -700,8 +704,14 @@ void sound_free(void)
         free(s_snd_buf);
         s_snd_buf = NULL;
     }
+    s_pcm_bytes = 0;
     memset(s_snd_off, 0, sizeof(s_snd_off));
     memset(s_snd_len, 0, sizeof(s_snd_len));
+}
+
+unsigned long sound_pcm_bytes(void)
+{
+    return s_pcm_bytes;
 }
 
 /* =========================================================================

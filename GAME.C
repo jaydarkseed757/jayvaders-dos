@@ -23,6 +23,7 @@
 #include "SOUND.H"
 #include "HISCORE.H"
 #include "GAME.H"
+#include "STATS.H"
 
 /* =========================================================================
  * Screen layout constants
@@ -281,6 +282,7 @@ static void start_wave(int wave)
             for (r = 0; r < SHIELD_H; r++)
                 s_shield_pix[i][r] = 0x00FFFFFFUL;
             s_shield_dirty[i] = 1;
+            g_stats.shield_pixels_total += SHIELD_W * SHIELD_H;
         }
     }
 
@@ -340,10 +342,20 @@ static int shield_bullet_erode(int bx, int by)
         int row = by - SHIELD_Y;
         int bit = bx - s_shield_x[si];
         if (row >= 0 && row < SHIELD_H && bit >= 0 && bit < SHIELD_W) {
+            if (s_shield_pix[si][row] & (1UL << (SHIELD_W - 1 - bit)))
+                g_stats.shield_pixels_eroded++;
             s_shield_pix[si][row] &= ~(1UL << (SHIELD_W - 1 - bit));
             /* Erode adjacent pixels for a realistic 3-pixel wide bullet. */
-            if (bit > 0)          s_shield_pix[si][row] &= ~(1UL << (SHIELD_W - bit));
-            if (bit < SHIELD_W-1) s_shield_pix[si][row] &= ~(1UL << (SHIELD_W - 2 - bit));
+            if (bit > 0) {
+                if (s_shield_pix[si][row] & (1UL << (SHIELD_W - bit)))
+                    g_stats.shield_pixels_eroded++;
+                s_shield_pix[si][row] &= ~(1UL << (SHIELD_W - bit));
+            }
+            if (bit < SHIELD_W-1) {
+                if (s_shield_pix[si][row] & (1UL << (SHIELD_W - 2 - bit)))
+                    g_stats.shield_pixels_eroded++;
+                s_shield_pix[si][row] &= ~(1UL << (SHIELD_W - 2 - bit));
+            }
         }
     } else {
         if (s_shield_dmg[si] < 3) s_shield_dmg[si]++;
@@ -364,9 +376,19 @@ static int shield_bomb_erode(int bx, int by)
         int row = by - SHIELD_Y;
         int bit = bx - s_shield_x[si];
         if (row >= 0 && row < SHIELD_H && bit >= 0 && bit < SHIELD_W) {
+            if (s_shield_pix[si][row] & (1UL << (SHIELD_W - 1 - bit)))
+                g_stats.shield_pixels_eroded++;
             s_shield_pix[si][row] &= ~(1UL << (SHIELD_W - 1 - bit));
-            if (bit > 0)          s_shield_pix[si][row] &= ~(1UL << (SHIELD_W - bit));
-            if (bit < SHIELD_W-1) s_shield_pix[si][row] &= ~(1UL << (SHIELD_W - 2 - bit));
+            if (bit > 0) {
+                if (s_shield_pix[si][row] & (1UL << (SHIELD_W - bit)))
+                    g_stats.shield_pixels_eroded++;
+                s_shield_pix[si][row] &= ~(1UL << (SHIELD_W - bit));
+            }
+            if (bit < SHIELD_W-1) {
+                if (s_shield_pix[si][row] & (1UL << (SHIELD_W - 2 - bit)))
+                    g_stats.shield_pixels_eroded++;
+                s_shield_pix[si][row] &= ~(1UL << (SHIELD_W - 2 - bit));
+            }
         }
     } else {
         if (s_shield_dmg[si] < 3) s_shield_dmg[si]++;
@@ -580,12 +602,14 @@ static int check_bullet_vs_invaders(void)
                 /* Hit */
                 s_alive[r] &= ~(1u << c);
                 s_inv_total--;
+                g_stats.invaders_killed++;
                 s_exp_row = r; s_exp_col = c; s_exp_timer = 10;
                 s_score += inv_score(r);
                 s_score_dirty = 1;
                 if (s_score >= s_gs.extra_life_score && !s_extra_life_awarded) {
                     s_lives++;
                     s_extra_life_awarded = 1;
+                    g_stats.extra_lives_earned++;
                     s_score_dirty = 1;
                 }
                 if (s_inv_total <= 0) s_wave_clear = 1;
@@ -608,6 +632,7 @@ static int check_bullet_vs_ufo(void)
                       blit_x, UFO_Y, UFO_W, UFO_H)) {
         s_ufo_score_val = s_ufo_scores[s_shot_count % 15];
         s_score += s_ufo_score_val;
+        g_stats.ufos_hit++;
         s_score_dirty = 1;
         s_ufo_exp_timer = 30;
         s_ufo_exp_x = blit_x;
@@ -752,6 +777,8 @@ static void update_march(void)
     s_march_timer--;
     if (s_march_timer > 0) return;
 
+    g_stats.march_events++;   /* one grid march step */
+
     /* March beat sound. */
     sound_play(SND_MARCH0 + (s_march_note & 3), SPRI_BG, 160);
     s_march_note = (s_march_note + 1) & 3;
@@ -807,6 +834,7 @@ static void update_player(void)
         s_bullet_x = (s_player_x + PLAYER_W / 2) & ~7;
         s_bullet_y = PLAYER_Y - BULLET_H;
         s_shot_count++;
+        g_stats.shots_fired++;
         sound_play(SND_FIRE, SPRI_HIGH, s_bullet_x);
     }
 }
@@ -840,7 +868,11 @@ static void update_bombs(void)
         by = s_bomb_y[i];
 
         /* Off bottom of screen. */
-        if (by >= PLAYER_Y + PLAYER_H) { s_bomb_x[i] = -1; continue; }
+        if (by >= PLAYER_Y + PLAYER_H) {
+            s_bomb_x[i] = -1;
+            g_stats.bombs_dodged++;
+            continue;
+        }
 
         /* vs player */
         check_bomb_vs_player(i);
@@ -987,6 +1019,8 @@ long game_run(const GameSettings *settings, long hiscore, int cpu_mode)
     s_game_over  = 0;
     s_wave_clear = 0;
 
+    g_stats.games_played++;
+
     start_wave(1);
 
     /* Initial draw. */
@@ -999,8 +1033,17 @@ long game_run(const GameSettings *settings, long hiscore, int cpu_mode)
     ega_dirty_reset();
 
     while (!s_game_over) {
+        /* If retrace is already underway after a full frame of work, the
+         * previous frame overran its vsync window -- count a miss. */
+        if (ega_vsync_active()) g_stats.vsync_misses++;
         ega_wait_vsync();
         inp_clear_edge();
+
+        /* ESC quits to DOS (cleanup() then shows the stats screen). */
+        if (inp_pressed(KEY_ESC)) { g_quit_requested = 1; return s_score; }
+
+        stats_sample_fps(s_wave);
+        if (s_score > g_stats.best_score) g_stats.best_score = (int)s_score;
 
         if (!s_plr_dead) {
             update_player();
@@ -1032,6 +1075,7 @@ long game_run(const GameSettings *settings, long hiscore, int cpu_mode)
         if (s_wave_clear && !s_game_over) {
             wave_clear_sequence();
             s_wave++;
+            g_stats.waves_cleared++;
             start_wave(s_wave);
             ega_clear(EGA_BLACK);
             draw_ground();
@@ -1051,7 +1095,8 @@ long game_run(const GameSettings *settings, long hiscore, int cpu_mode)
  *
  * Compile:
  *   wcc -ml -zf -DGAME_TEST GAME.C
- *   wlink system dos file GAME.obj name GAMETEST
+ *   wcc -ml -zf STATS.C        (GAME now references g_stats)
+ *   wlink system dos file { GAME.obj STATS.obj } name GAMETEST
  * =========================================================================*/
 #ifdef GAME_TEST
 

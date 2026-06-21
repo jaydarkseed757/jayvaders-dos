@@ -79,6 +79,7 @@ typedef struct {
 void ega_set_mode(void);
 void ega_set_text_mode(void);
 void ega_wait_vsync(void);
+int  ega_vsync_active(void);   /* 1 if a vertical retrace is in progress */
 
 /* Plane helper (exported for CACHE/SPRITES direct plane access) */
 void ega_set_plane(unsigned char mask);

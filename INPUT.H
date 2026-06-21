@@ -21,6 +21,10 @@
 #define KEY_ENTER  6  /* Enter (initials entry confirm) */
 #define KEY_COUNT  7
 
+/* Set to 1 when the player requests quit-to-DOS (ESC). The main loop checks
+ * this after title_run()/game_run() and breaks; cleanup() then shows stats. */
+extern int g_quit_requested;
+
 /* -------------------------------------------------------------------------
  * API
  * -------------------------------------------------------------------------*/
