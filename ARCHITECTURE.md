@@ -694,9 +694,26 @@ No floating point. No blocking delays. All timing via vsync and frame counters.
 - Targets: `all`, `clean`, `rebuild`.
 - Compiler: `wcc` (C, real-mode DOS). Linker: `wlink`. Output: `INVADERS.EXE`.
 - **Memory model: medium, fixed** (see D6).
-- **No-float discipline:** compile with `-zf` and link without floating-point
-  libraries so accidental float use fails the build.
-- Optimize for size (`-os`) — particularly relevant to the 386 target.
+
+### Compiler flags (`CFLAGS = -ml -3 -zf -zp1 -os -s -d0 -W3`)
+
+| Flag | Rationale |
+|------|-----------|
+| `-ml` | Medium model — far code, near data. Fixed (see D6). |
+| `-3` | Explicit 386 instruction set. Default in `wcc` but stated for clarity. Do not raise to `-4`/`-5`: CPU-scheduling hints are meaningless inside DOSBox (it processes guest instructions one-by-one); on real hardware the game is EGA-bus bound, not CPU bound. |
+| `-zf` | No floating point. Any accidental FP use fails the build. |
+| `-zp1` | Pack structs to 1-byte alignment. Required so on-disk formats (`HiScoreEntry` in `HISCORES.DAT`, `SessionStats`) have no invisible padding between fields. |
+| `-os` | Optimize for size over speed. Smaller code improves instruction-cache hit rate on real 386/486 hardware, which matters more than scheduling for a game this compact. The inner loop is EGA-bandwidth bound, not compute bound. |
+| `-s` | Strip stack-overflow checks. Saves a few bytes and cycles per call; safe because the stack budget (8 KB) is generous for a flat-model DOS game. |
+| `-d0` | No debug info — release build. |
+| `-W3` | Elevated warning level. Catches signed/unsigned mismatches and implicit-conversion issues that `-W1` (default) misses. |
+
+### Linker options
+
+`option stack=8192` — 8 KB stack (generous for this call depth).  
+`option map` — emits `INVADERS.MAP` showing exact segment and symbol sizes.
+Useful for auditing actual DGROUP usage and verifying that DGROUP stays well
+under 64 KB.
 
 ---
 

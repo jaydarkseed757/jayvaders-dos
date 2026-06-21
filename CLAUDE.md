@@ -16,17 +16,26 @@ Final deliverable: `INVADERS.EXE` plus data files generated on first run.
 - **Compiler:** Open Watcom 2.0 — `wcc` (16-bit real-mode DOS), linker `wlink`.
 - **Build:** `wmake`.
 - **Memory model:** medium (near data, far code) — **fixed, not configurable**.
+- **CFLAGS:** `-ml -3 -zf -zp1 -os -s -d0 -W3`
+
+Key flag notes:
+- `-3` — explicit 386 target. Do **not** raise to `-4`/`-5`: DOSBox processes
+  guest instructions individually so pipeline scheduling hints do nothing; on real
+  hardware the bottleneck is EGA bus bandwidth, not CPU throughput.
+- `-zp1` — 1-byte struct packing. Required so `HiScoreEntry` and `SessionStats`
+  have no invisible padding when written/read from disk.
+- `-os` — optimize for size (better I-cache on real hardware) over `-ot` (speed);
+  correct because the game is bus-bound, not compute-bound.
+- `option map` in the link step generates `INVADERS.MAP` — exact segment sizes,
+  useful for auditing DGROUP stays under 64 KB.
 
 ### Build commands
 
 ```
 wmake          # default target: all -> INVADERS.EXE
-wmake clean     # remove objects and binary
-wmake rebuild   # clean then all
+wmake clean    # remove objects and binary
+wmake rebuild  # clean then all
 ```
-
-(The MAKEFILE is authored last in the build order; until it exists these are
-the intended targets.)
 
 ## Hard Constraints — do not violate
 
@@ -70,6 +79,7 @@ INPUT.C     keyboard via port 60h
 SOUND.C     PC speaker, SB, SB Pro detection + playback
 HISCORE.C   high score table load/save/entry
 GAME.C      invader grid, bullets, collision, shields, wave logic
+STATS.C/.H  session statistics: counters, FPS sampling, exit summary screen
 MAKEFILE    Open Watcom wmake
 ```
 
